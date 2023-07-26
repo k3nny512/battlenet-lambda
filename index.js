@@ -1,60 +1,25 @@
-const axios = require('axios');
-const querystring = require('querystring');
 const uuid = require('uuid');
-const AWS = require('aws-sdk');
-const dynamoDB = new AWS.DynamoDB.DocumentClient();
+const { getAccessToken, getAuthUrl } = require('./auth');
+const { getSession, putSession } = require('./session');
 
 exports.handler = async (event) => {
-    const client_id =  process.env.client_ID;
-    const client_secret = process.env.client_secret;
-    const redirect_uri = process.env.redirect_uri;
-
     try {
         if (event.queryStringParameters && event.queryStringParameters.code) {
             const code = event.queryStringParameters.code;
             const state = event.queryStringParameters.state;
 
             // Retrieve the session from DynamoDB
-            const getSessionParams = {
-                TableName: 'boe.zip-user-data',
-                Key: {
-                    'SessionId': state
-                }
-            };
-            const session = await dynamoDB.get(getSessionParams).promise();
+            const session = await getSession(state);
 
             if (!session.Item || session.Item.SessionId !== state) {
                 throw new Error('State does not match');
             }
 
-            const response = await axios.post('https://eu.battle.net/oauth/token', querystring.stringify({
-                grant_type: 'authorization_code',
-                client_id: client_id,
-                client_secret: client_secret,
-                code: code,
-                redirect_uri: redirect_uri
-            }));
-            const access_token = response.data.access_token;
+            const access_token = await getAccessToken(code);
 
             const session_id = uuid.v4();
 
-            const putParams = {
-                TableName: 'boe.zip-user-data',
-                Item: {
-                    'SessionId': session_id,
-                    'AccessToken': access_token
-                }
-            };
-
-            dynamoDB.put(putParams, function(err, data) {
-                if (err) {
-                    console.error("Error storing item in DynamoDB", err);
-                    return {
-                        statusCode: 500,
-                        body: 'An error occurred: ' + err.toString()
-                    };
-                }
-            });
+            await putSession(session_id, access_token);
 
             const url = `https://www.boe.zip/?session_id=${session_id}`;
             return {
@@ -67,32 +32,9 @@ exports.handler = async (event) => {
         } else {
             const state = uuid.v4();
 
-            const putParams = {
-                TableName: 'boe.zip-user-data',
-                Item: {
-                    'SessionId': state,
-                    'State': state
-                }
-            };
+            await putSession(state, state);
 
-            dynamoDB.put(putParams, function(err, data) {
-                if (err) {
-                    console.error("Error storing item in DynamoDB", err);
-                    return {
-                        statusCode: 500,
-                        body: 'An error occurred: ' + err.toString()
-                    };
-                }
-            });
-
-            const authParams = querystring.stringify({
-                client_id: client_id,
-                redirect_uri: redirect_uri,
-                response_type: 'code',
-                scope: 'openid',
-                state: state
-            });
-            const url = 'https://eu.battle.net/oauth/authorize?' + authParams;
+            const url = getAuthUrl(state);
             return {
                 statusCode: 302,
                 headers: {
