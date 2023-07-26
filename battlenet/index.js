@@ -38,7 +38,10 @@ exports.handler = async (event) => {
                 statusCode: 302,
                 headers: {
                     Location: url,
-                    'Set-Cookie': `session_id=${session_id}; Secure; SameSite=None; UserInfo=${JSON.stringify(userInfo)}`
+                    'Set-Cookie': [
+                        `session_id=${session_id}; Secure; SameSite=None`,
+                        `UserInfo=${JSON.stringify(userInfo)}; Secure; SameSite=None`
+                    ]
                 }
             };
         } else {
