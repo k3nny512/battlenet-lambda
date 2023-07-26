@@ -32,7 +32,7 @@ exports.handler = async (event) => {
 
             await putSession(session_id, { access_token, userInfo });
 
-            const url = `https://www.boe.zip/?session_id=${session_id}`;
+            const url = `https://www.boe.zip/`;
             console.log("Redirecting to:", url);
             return {
                 statusCode: 302,
