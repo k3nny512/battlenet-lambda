@@ -1,13 +1,13 @@
-const axios = require('axios');
+const getUserInfo = async (access_token, region) => {
+    console.log('Getting user info...');
 
-async function getUserInfo(accessToken, region) {
-    const response = await axios.get(`https://${region}.api.battle.net/wow/user/characters`, {
+    const response = await axios.get(`https://${region}.battle.net/oauth/userinfo`, {
         headers: {
-            'Authorization': `Bearer ${accessToken}`
+            'Authorization': `Bearer ${access_token}`
         }
     });
 
-    return response.data;
-}
+    console.log('User info:', response.data);
 
-module.exports = getUserInfo;
+    return response.data;
+};
