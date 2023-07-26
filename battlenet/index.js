@@ -1,6 +1,7 @@
 const uuid = require('uuid');
 const { getAccessToken, getAuthUrl } = require('./auth');
 const { getSession, putSession } = require('./session');
+const getUserInfo = require('./getUserInfo');
 
 exports.handler = async (event) => {
     try {
@@ -17,16 +18,19 @@ exports.handler = async (event) => {
 
             const access_token = await getAccessToken(code);
 
+            // Get user info
+            const userInfo = await getUserInfo(access_token, 'eu'); // replace 'eu' with the appropriate region
+
             const session_id = uuid.v4();
 
-            await putSession(session_id, access_token);
+            await putSession(session_id, { access_token, userInfo });
 
             const url = `https://www.boe.zip/?session_id=${session_id}`;
             return {
                 statusCode: 302,
                 headers: {
                     Location: url,
-                    'Set-Cookie': `session_id=${session_id}; Secure; SameSite=None`
+                    'Set-Cookie': `session_id=${session_id}; Secure; SameSite=None; UserInfo=${JSON.stringify(userInfo)}`
                 }
             };
         } else {
