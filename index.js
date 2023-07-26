@@ -1,21 +1,32 @@
 const axios = require('axios');
 const querystring = require('querystring');
 const uuid = require('uuid');
-
-// A simple in-memory session store
-const sessions = {};
+const AWS = require('aws-sdk');
+const dynamoDB = new AWS.DynamoDB.DocumentClient();
 
 exports.handler = async (event) => {
-    // Your client ID, secret, and redirect URI
-    const client_id = 'dd7c83308992421c84c3d38f2547aa56';
-    const client_secret = 'iSA6h96WVw4UWWSyObbJ0nhfdI7ch3Vc';
-    const redirect_uri = 'https://i8q13x3b0b.execute-api.eu-central-1.amazonaws.com/default/battlenet';
+    const client_id =  process.env.client_ID;
+    const client_secret = process.env.client_secret;
+    const redirect_uri = process.env.redirect_uri;
 
     try {
-        // Check if we've been redirected back from Battle.net
         if (event.queryStringParameters && event.queryStringParameters.code) {
-            // We have an authorization code, exchange it for an access token
             const code = event.queryStringParameters.code;
+            const state = event.queryStringParameters.state;
+
+            // Retrieve the session from DynamoDB
+            const getSessionParams = {
+                TableName: 'boe.zip-user-data',
+                Key: {
+                    'SessionId': state
+                }
+            };
+            const session = await dynamoDB.get(getSessionParams).promise();
+
+            if (!session.Item || session.Item.SessionId !== state) {
+                throw new Error('State does not match');
+            }
+
             const response = await axios.post('https://eu.battle.net/oauth/token', querystring.stringify({
                 grant_type: 'authorization_code',
                 client_id: client_id,
@@ -25,30 +36,63 @@ exports.handler = async (event) => {
             }));
             const access_token = response.data.access_token;
 
-            // Create a new session
             const session_id = uuid.v4();
-            sessions[session_id] = {
-                access_token: access_token
+
+            const putParams = {
+                TableName: 'boe.zip-user-data',
+                Item: {
+                    'SessionId': session_id,
+                    'AccessToken': access_token
+                }
             };
 
-            // Redirect back to your website with the session ID in a secure HTTP-only cookie
-            const url = 'http://127.0.0.1:5500/index.html';
+            dynamoDB.put(putParams, function(err, data) {
+                if (err) {
+                    console.error("Error storing item in DynamoDB", err);
+                    return {
+                        statusCode: 500,
+                        body: 'An error occurred: ' + err.toString()
+                    };
+                }
+            });
+
+            const url = `https://www.boe.zip/?session_id=${session_id}`;
             return {
                 statusCode: 302,
                 headers: {
                     Location: url,
-                    'Set-Cookie': `session_id=${session_id}; Secure; HttpOnly`
+                    'Set-Cookie': `session_id=${session_id}; Secure; SameSite=None`
                 }
             };
         } else {
-            // Redirect the user to the Battle.net login page
-            const params = querystring.stringify({
+            const state = uuid.v4();
+
+            const putParams = {
+                TableName: 'boe.zip-user-data',
+                Item: {
+                    'SessionId': state,
+                    'State': state
+                }
+            };
+
+            dynamoDB.put(putParams, function(err, data) {
+                if (err) {
+                    console.error("Error storing item in DynamoDB", err);
+                    return {
+                        statusCode: 500,
+                        body: 'An error occurred: ' + err.toString()
+                    };
+                }
+            });
+
+            const authParams = querystring.stringify({
                 client_id: client_id,
                 redirect_uri: redirect_uri,
                 response_type: 'code',
-                scope: 'openid'
+                scope: 'openid',
+                state: state
             });
-            const url = 'https://eu.battle.net/oauth/authorize?' + params;
+            const url = 'https://eu.battle.net/oauth/authorize?' + authParams;
             return {
                 statusCode: 302,
                 headers: {
@@ -57,7 +101,6 @@ exports.handler = async (event) => {
             };
         }
     } catch (error) {
-        // An error occurred, return a 500 Internal Server Error response
         return {
             statusCode: 500,
             body: 'An error occurred: ' + error.toString()
