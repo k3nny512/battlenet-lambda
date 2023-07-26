@@ -2,24 +2,39 @@ const AWS = require('aws-sdk');
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
 
 async function getSession(state) {
+    console.log('Getting session...');
+    console.log('State:', state);
+
     const getSessionParams = {
         TableName: 'boe.zip-user-data',
         Key: {
             'SessionId': state
         }
     };
-    return await dynamoDB.get(getSessionParams).promise();
+    const session = await dynamoDB.get(getSessionParams).promise();
+
+    console.log('Session:', session);
+
+    return session;
 }
 
-async function putSession(session_id, access_token) {
+async function putSession(session_id, data) {
+    console.log('Putting session...');
+    console.log('Session ID:', session_id);
+    console.log('Data:', data);
+
     const putParams = {
         TableName: 'boe.zip-user-data',
         Item: {
             'SessionId': session_id,
-            'AccessToken': access_token
+            'Data': data
         }
     };
-    return await dynamoDB.put(putParams).promise();
+    const result = await dynamoDB.put(putParams).promise();
+
+    console.log('Put result:', result);
+
+    return result;
 }
 
 module.exports = { getSession, putSession };
