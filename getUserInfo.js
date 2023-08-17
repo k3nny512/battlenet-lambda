@@ -7,7 +7,7 @@ const getUserInfo = async (access_token, region) => {
 
     const response = await axios.get(`https://${region}.battle.net/oauth/userinfo`, {
         headers: {
-            'Authorization': `Bearer ${access_token}`
+                        'Authorization': `Bearer ${access_token}`
         }
     });
 

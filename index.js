@@ -11,7 +11,7 @@ exports.handler = async (event) => {
 
             // Retrieve the session from DynamoDB
             const session = await getSession(state);
-
+            
             if (!session.Item || session.Item.SessionId !== state) {
                 throw new Error('State does not match');
             }
@@ -27,22 +27,48 @@ exports.handler = async (event) => {
                 statusCode: 302,
                 headers: {
                     Location: url,
-                    'Set-Cookie': `session_id=${session_id}; Secure; SameSite=None`
                 }
             };
         }else if (event.queryStringParameters && event.queryStringParameters.session_id) {
             const sessionId = event.queryStringParameters.session_id;
-            // Now you can work with the sessionId
-            // For example, retrieve data associated with this session ID from your database
+            console.log("session id:", sessionId);
 
+            // Retrieve the session from DynamoDB
+            const session = await getSession(sessionId);
+            console.log("session:", session);
 
+            const token = session.Item.AccessToken
+            console.log("token id:", token);
 
 
             // Get user info
-            const userInfo = await getUserInfo(sessionId, 'eu'); // replace 'eu' with the appropriate region
+            const userInfo = await getUserInfo(token, 'eu'); // replace 'eu' with the appropriate region
             console.log("User info:", userInfo);
 
-            return userInfo;
+            
+            const url = `https://www.boe.zip/?user_info=${userInfo}`;
+            return {
+                statusCode: 302,
+                headers: {
+                    Location: url,
+                },
+                body: userInfo  
+                
+
+
+
+
+                //####################################################################
+                // todo: ab hier nochmal gucken, umbauen zu fetch und weg von den queryParams
+                //##################################################################
+
+
+
+
+
+
+
+            };
 
         } else {
             const state = uuid.v4();
