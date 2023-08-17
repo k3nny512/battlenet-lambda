@@ -1,6 +1,7 @@
 const uuid = require('uuid');
 const { getAccessToken, getAuthUrl } = require('./auth');
 const { getSession, putSession } = require('./session');
+const getUserInfo = require('./getUserInfo');
 
 exports.handler = async (event) => {
     try {
@@ -29,6 +30,20 @@ exports.handler = async (event) => {
                     'Set-Cookie': `session_id=${session_id}; Secure; SameSite=None`
                 }
             };
+        }else if (event.queryStringParameters && event.queryStringParameters.session_id) {
+            const sessionId = event.queryStringParameters.session_id;
+            // Now you can work with the sessionId
+            // For example, retrieve data associated with this session ID from your database
+
+
+
+
+            // Get user info
+            const userInfo = await getUserInfo(sessionId, 'eu'); // replace 'eu' with the appropriate region
+            console.log("User info:", userInfo);
+
+            return userInfo;
+
         } else {
             const state = uuid.v4();
 
